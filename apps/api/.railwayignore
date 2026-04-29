@@ -1,0 +1,10 @@
+.env
+.env.*
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+restaurant_skill_loop.sqlite
+*.sqlite
+*.sqlite3
+*.egg-info/
