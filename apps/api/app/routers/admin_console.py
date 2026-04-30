@@ -1,6 +1,6 @@
 import hmac
 import html
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, quote
 
 from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -11,8 +11,9 @@ from sqlalchemy.orm import Session, selectinload
 from app.config import get_settings
 from app.database import get_db
 from app.models import Restaurant
-from app.schemas import CreateUserInput, RestaurantAccountInput, RestaurantInput, RestaurantOnboardingInput, UpdateUserInput
+from app.schemas import RestaurantAccountInput, RestaurantInput, RestaurantOnboardingInput, UpdateUserInput
 from app.services import admin as admin_service
+from app.services import notifications
 
 router = APIRouter(prefix="/admin", tags=["admin-console"])
 SESSION_KEY = "restaurant_skill_loop_admin"
@@ -28,6 +29,18 @@ def split_csv(value: str | None) -> list[str]:
 
 def checked(value: bool) -> str:
     return "checked" if value else ""
+
+
+def alert_html(notice: str | None = None, error: str | None = None) -> str:
+    if error:
+        return f'<p class="notice error">{esc(error)}</p>'
+    if notice:
+        return f'<p class="notice">{esc(notice)}</p>'
+    return ""
+
+
+def error_detail(exc: Exception) -> str:
+    return str(getattr(exc, "detail", None) or exc)
 
 
 def is_admin_authenticated(request: Request) -> bool:
@@ -96,6 +109,8 @@ def page(title: str, body: str, status_code: int = 200) -> HTMLResponse:
     .status.closed, .status.hidden, .status.inactive {{ color: var(--red); }}
     .notice {{ background: #edf6f0; border-left: 4px solid var(--green); padding: 10px 12px; margin-bottom: 16px; }}
     .error {{ background: #fff0ee; border-left-color: var(--red); color: var(--red); }}
+    .danger-zone {{ border-color: #e0aaa4; }}
+    .danger-zone h2 {{ color: var(--red); }}
     @media (max-width: 760px) {{ .topbar, .grid {{ display: grid; grid-template-columns: 1fr; }} }}
   </style>
 </head>
@@ -126,39 +141,65 @@ def restaurant_form(
     account_phone: str = "",
     account_email: str = "",
     account_active: bool = True,
+    form_data: dict[str, str] | None = None,
 ) -> str:
     is_edit = restaurant is not None
     cuisine = ", ".join(restaurant.cuisine_tags or []) if restaurant else ""
     modes = ", ".join(restaurant.service_modes or ["pickup"]) if restaurant else "pickup"
+    name = form_data.get("name", "") if form_data is not None else (restaurant.name if restaurant else "")
+    phone = form_data.get("account_phone", account_phone) if form_data is not None else account_phone
+    description = (
+        form_data.get("description", "") if form_data is not None else (restaurant.description if restaurant else "")
+    )
+    location_text = (
+        form_data.get("location_text", "")
+        if form_data is not None
+        else (restaurant.location_text if restaurant else "")
+    )
+    email = form_data.get("account_email", account_email) if form_data is not None else account_email
+    cuisine_value = form_data.get("cuisine_tags", cuisine) if form_data is not None else cuisine
+    modes_value = form_data.get("service_modes", modes) if form_data is not None else modes
+    pickup_instructions = (
+        form_data.get("pickup_instructions", "")
+        if form_data is not None
+        else (restaurant.pickup_instructions if restaurant else "")
+    )
+    status_value = form_data.get("status", "open") if form_data is not None else (restaurant.status if restaurant else "open")
+    mcp_visible = (
+        form_data.get("mcp_visible") == "on"
+        if form_data is not None
+        else (True if not restaurant else restaurant.mcp_visible)
+    )
+    active = form_data.get("account_active") == "on" if form_data is not None else account_active
     return f"""
 <div class="grid">
-  <label class="field"><span>Restaurant name</span><input name="name" required value="{esc(restaurant.name if restaurant else "")}" /></label>
-  <label class="field"><span>Account phone</span><input name="account_phone" required value="{esc(account_phone)}" placeholder="+614..." /></label>
+  <label class="field"><span>Restaurant name</span><input name="name" required value="{esc(name)}" /></label>
+  <label class="field"><span>Account phone</span><input name="account_phone" required value="{esc(phone)}" placeholder="+614..." /></label>
 </div>
 <div class="grid">
-  <label class="field"><span>Description</span><textarea name="description">{esc(restaurant.description if restaurant else "")}</textarea></label>
+  <label class="field"><span>Description</span><textarea name="description">{esc(description)}</textarea></label>
   <label class="field"><span>{'New password (optional)' if is_edit else 'Initial password'}</span><input name="account_password" {'required' if not is_edit else ''} type="password" /></label>
 </div>
 <div class="grid">
-  <label class="field"><span>Restaurant location</span><input name="location_text" value="{esc(restaurant.location_text if restaurant else "")}" placeholder="Near Unimelb, e.g. Swanston St" /></label>
-  <label class="field"><span>Account email (optional)</span><input name="account_email" type="email" value="{esc(account_email)}" /></label>
+  <label class="field"><span>Restaurant location</span><input name="location_text" value="{esc(location_text)}" placeholder="Near Unimelb, e.g. Swanston St" /></label>
+  <label class="field"><span>Account email (optional)</span><input name="account_email" type="email" value="{esc(email)}" /></label>
 </div>
 <div class="grid">
-  <label class="field"><span>Cuisine tags</span><input name="cuisine_tags" value="{esc(cuisine)}" /></label>
-  <label class="field"><span>Service modes</span><input name="service_modes" value="{esc(modes)}" /></label>
+  <label class="field"><span>Cuisine tags</span><input name="cuisine_tags" value="{esc(cuisine_value)}" /></label>
+  <label class="field"><span>Service modes</span><input name="service_modes" value="{esc(modes_value)}" /></label>
 </div>
 <div class="grid">
-  <label class="field"><span>Pickup instructions</span><input name="pickup_instructions" value="{esc(restaurant.pickup_instructions if restaurant else "")}" /></label>
+  <label class="field"><span>Pickup instructions</span><input name="pickup_instructions" value="{esc(pickup_instructions)}" /></label>
   <label class="field"><span>Status</span>
     <select name="status">
-      <option value="open" {'selected' if not restaurant or restaurant.status == 'open' else ''}>open</option>
-      <option value="closed" {'selected' if restaurant and restaurant.status == 'closed' else ''}>closed</option>
+      <option value="open" {'selected' if status_value == 'open' else ''}>open</option>
+      <option value="closed" {'selected' if status_value == 'closed' else ''}>closed</option>
     </select>
   </label>
 </div>
 <div class="row">
-  <label class="row"><input name="mcp_visible" type="checkbox" {checked(True if not restaurant else restaurant.mcp_visible)} /> MCP visible</label>
-  <label class="row"><input name="account_active" type="checkbox" {checked(account_active)} /> Account active</label>
+  <label class="row"><input name="mcp_visible" type="checkbox" {checked(mcp_visible)} /> MCP visible</label>
+  <label class="row"><input name="account_active" type="checkbox" {checked(active)} /> Account active</label>
   <button type="submit">{'Save changes' if is_edit else 'Create restaurant'}</button>
 </div>
 """
@@ -174,6 +215,56 @@ def restaurant_input_from_form(data: dict[str, str]) -> RestaurantInput:
         status=data.get("status", "open"),
         mcp_visible=data.get("mcp_visible") == "on",
         pickup_instructions=data.get("pickup_instructions", "").strip() or None,
+    )
+
+
+def restaurant_detail_body(
+    restaurant: Restaurant,
+    account,
+    notice: str | None = None,
+    error: str | None = None,
+    form_data: dict[str, str] | None = None,
+) -> str:
+    account_html = (
+        f"<p>{esc(account.phone)}"
+        f"{' · ' + esc(account.email) if account.email else ''}"
+        f" - <span class=\"status {'active' if account.is_active else 'inactive'}\">{'active' if account.is_active else 'inactive'}</span></p>"
+        if account
+        else "<p>No restaurant account is bound yet.</p>"
+    )
+    sms_html = (
+        f"""
+  <form method="post" action="/admin/restaurants/{esc(restaurant.id)}/test-sms">
+    <button class="secondary" type="submit">Send test SMS</button>
+  </form>
+"""
+        if account and account.is_active and account.phone
+        else '<p class="notice error">No active account phone is available for SMS testing.</p>'
+    )
+    return (
+        alert_html(notice, error)
+        + f"""
+<section class="panel">
+  <h2>Bound account</h2>
+  {account_html}
+  <div class="row" style="margin-top: 12px;">
+    {sms_html}
+  </div>
+</section>
+<form class="panel" method="post" action="/admin/restaurants/{esc(restaurant.id)}">
+  <h2>Edit restaurant</h2>
+  {restaurant_form(restaurant, account.phone if account else "", account.email if account else "", account.is_active if account else True, form_data=form_data)}
+</form>
+<section class="panel danger-zone">
+  <h2>Delete restaurant</h2>
+  <p class="muted">This permanently deletes the restaurant, account, menu, and orders. Type the restaurant name to confirm.</p>
+  <form method="post" action="/admin/restaurants/{esc(restaurant.id)}/delete">
+    <label class="field"><span>Confirm restaurant name</span><input name="confirm_name" placeholder="{esc(restaurant.name)}" required /></label>
+    <button class="danger" type="submit">Delete restaurant</button>
+  </form>
+</section>
+<p><a class="button secondary" href="/admin">Back to restaurants</a></p>
+"""
     )
 
 
@@ -250,6 +341,7 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
     return page(
         "Restaurants",
         topbar("Restaurants")
+        + alert_html(request.query_params.get("notice"), request.query_params.get("error"))
         + """
 <div class="row" style="margin-bottom: 16px;">
   <a class="button" href="/admin/restaurants/new">Add restaurant</a>
@@ -304,8 +396,15 @@ async def create_restaurant(request: Request, db: Session = Depends(get_db)):
             ),
         )
     except (ValidationError, Exception) as exc:
-        detail = getattr(exc, "detail", str(exc))
-        return page("Add restaurant", topbar("Add restaurant") + f'<p class="notice error">{esc(detail)}</p><form class="panel" method="post" action="/admin/restaurants/new">{restaurant_form()}</form>', status_code=400)
+        db.rollback()
+        detail = error_detail(exc)
+        return page(
+            "Add restaurant",
+            topbar("Add restaurant")
+            + alert_html(error=detail)
+            + f'<form class="panel" method="post" action="/admin/restaurants/new">{restaurant_form(form_data=data)}</form>',
+            status_code=400,
+        )
     return RedirectResponse(f"/admin/restaurants/{created['restaurant']['id']}", status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -319,27 +418,15 @@ def restaurant_detail(
         return admin_redirect()
     restaurant = admin_service.get_restaurant_with_accounts(db, restaurant_id)
     account = admin_service.primary_account(restaurant)
-    account_html = (
-        f"<p>{esc(account.phone)}"
-        f"{' · ' + esc(account.email) if account.email else ''}"
-        f" - <span class=\"status {'active' if account.is_active else 'inactive'}\">{'active' if account.is_active else 'inactive'}</span></p>"
-        if account
-        else "<p>No restaurant account is bound yet.</p>"
-    )
     return page(
         restaurant.name,
         topbar(restaurant.name)
-        + f"""
-<section class="panel">
-  <h2>Bound account</h2>
-  {account_html}
-</section>
-<form class="panel" method="post" action="/admin/restaurants/{esc(restaurant.id)}">
-  <h2>Edit restaurant</h2>
-  {restaurant_form(restaurant, account.phone if account else "", account.email if account else "", account.is_active if account else True)}
-</form>
-<p><a class="button secondary" href="/admin">Back to restaurants</a></p>
-""",
+        + restaurant_detail_body(
+            restaurant,
+            account,
+            notice=request.query_params.get("notice"),
+            error=request.query_params.get("error"),
+        ),
     )
 
 
@@ -353,40 +440,72 @@ async def update_restaurant(
         return admin_redirect()
     data = await read_form(request)
     try:
-        admin_service.update_restaurant(db, restaurant_id, restaurant_input_from_form(data))
-        restaurant = admin_service.get_restaurant_with_accounts(db, restaurant_id)
-        account = admin_service.primary_account(restaurant)
-        if account:
-            admin_service.update_user(
-                db,
-                account.id,
-                UpdateUserInput(
-                    phone=data.get("account_phone", "").strip(),
-                    email=data.get("account_email", "").strip(),
-                    password=data.get("account_password", "") or None,
-                    restaurant_id=restaurant.id,
-                    is_active=data.get("account_active") == "on",
-                ),
-            )
-        elif data.get("account_phone") and data.get("account_password"):
-            admin_service.create_user(
-                db,
-                CreateUserInput(
-                    phone=data.get("account_phone", "").strip(),
-                    email=data.get("account_email", "").strip(),
-                    password=data.get("account_password", ""),
-                    restaurant_id=restaurant.id,
-                    is_active=data.get("account_active") == "on",
-                ),
-            )
+        admin_service.update_restaurant_and_account(
+            db,
+            restaurant_id,
+            restaurant_input_from_form(data),
+            UpdateUserInput(
+                phone=data.get("account_phone", "").strip(),
+                email=data.get("account_email", "").strip(),
+                password=data.get("account_password", "") or None,
+                restaurant_id=restaurant_id,
+                is_active=data.get("account_active") == "on",
+            ),
+        )
     except (ValidationError, Exception) as exc:
-        detail = getattr(exc, "detail", str(exc))
+        db.rollback()
+        detail = error_detail(exc)
         restaurant = admin_service.get_restaurant_with_accounts(db, restaurant_id)
         account = admin_service.primary_account(restaurant)
         return page(
             restaurant.name,
             topbar(restaurant.name)
-            + f'<p class="notice error">{esc(detail)}</p><form class="panel" method="post" action="/admin/restaurants/{esc(restaurant.id)}">{restaurant_form(restaurant, account.phone if account else "", account.email if account else "", account.is_active if account else True)}</form>',
+            + restaurant_detail_body(restaurant, account, error=detail, form_data=data),
             status_code=400,
         )
     return RedirectResponse(f"/admin/restaurants/{restaurant_id}", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/restaurants/{restaurant_id}/test-sms", response_class=HTMLResponse)
+def send_test_sms(
+    restaurant_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    if not is_admin_authenticated(request):
+        return admin_redirect()
+    try:
+        notifications.send_test_order_sms(db, restaurant_id)
+    except Exception as exc:
+        db.rollback()
+        return RedirectResponse(
+            f"/admin/restaurants/{restaurant_id}?error={quote(error_detail(exc), safe='')}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    return RedirectResponse(
+        f"/admin/restaurants/{restaurant_id}?notice={quote('Test SMS sent.', safe='')}",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post("/restaurants/{restaurant_id}/delete", response_class=HTMLResponse)
+async def delete_restaurant(
+    restaurant_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    if not is_admin_authenticated(request):
+        return admin_redirect()
+    data = await read_form(request)
+    try:
+        admin_service.hard_delete_restaurant(db, restaurant_id, data.get("confirm_name", ""))
+    except Exception as exc:
+        db.rollback()
+        return RedirectResponse(
+            f"/admin/restaurants/{restaurant_id}?error={quote(error_detail(exc), safe='')}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    return RedirectResponse(
+        f"/admin?notice={quote('Restaurant deleted.', safe='')}",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )

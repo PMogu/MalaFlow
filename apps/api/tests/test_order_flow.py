@@ -6,10 +6,18 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.database import Base
-from app.models import MenuItem, Restaurant, User
-from app.schemas import CreateOrderInput, OrderItemInput, RestaurantAccountInput, RestaurantInput, RestaurantOnboardingInput
+from app.models import McpCallLog, MenuItem, Order, OrderItem, Restaurant, User
+from app.schemas import (
+    CreateOrderInput,
+    OrderItemInput,
+    RestaurantAccountInput,
+    RestaurantInput,
+    RestaurantOnboardingInput,
+    UpdateUserInput,
+)
 from app.security import hash_password
-from app.services import admin, auth, orders, restaurants
+from app.services import admin, auth, notifications, orders, restaurants
+from app.routers.admin_console import restaurant_form
 
 
 @pytest.fixture()
@@ -209,3 +217,156 @@ def test_order_creation_survives_notification_failure(db, monkeypatch):
 
     assert order["status"] == "submitted"
     assert db.query(MenuItem).count() == 1
+
+
+def test_admin_restaurant_form_preserves_submitted_values():
+    html = restaurant_form(
+        form_data={
+            "name": "蘑菇屋",
+            "account_phone": "+61435394123",
+            "description": "Hot soup near campus",
+            "location_text": "Student housing L1",
+            "account_email": "owner@example.test",
+            "cuisine_tags": "hot, soup",
+            "service_modes": "pickup",
+            "pickup_instructions": "counter",
+            "status": "closed",
+            "account_active": "on",
+        }
+    )
+
+    assert 'value="蘑菇屋"' in html
+    assert 'value="+61435394123"' in html
+    assert "Hot soup near campus" in html
+    assert 'value="Student housing L1"' in html
+    assert 'value="owner@example.test"' in html
+    assert 'value="hot, soup"' in html
+    assert 'value="pickup"' in html
+    assert 'value="counter"' in html
+    assert '<option value="closed" selected>closed</option>' in html
+    assert "MCP visible" in html
+
+
+def test_admin_update_restaurant_and_account_is_atomic_on_account_error(db):
+    restaurant = db.query(Restaurant).first()
+    db.add(
+        User(
+            phone="+61400000003",
+            email="owner@example.test",
+            password_hash=hash_password("owner-pass"),
+            role="restaurant",
+            restaurant_id=restaurant.id,
+            is_active=True,
+        )
+    )
+    db.add(
+        User(
+            phone="+61400000004",
+            email="other@example.test",
+            password_hash=hash_password("other-pass"),
+            role="restaurant",
+            is_active=True,
+        )
+    )
+    db.commit()
+
+    with pytest.raises(HTTPException) as exc:
+        admin.update_restaurant_and_account(
+            db,
+            restaurant.id,
+            RestaurantInput(name="Changed Name", service_modes=["pickup"], status="closed", mcp_visible=False),
+            UpdateUserInput(phone="+61400000004", password="updated-pass"),
+        )
+
+    assert exc.value.detail == "PHONE_EXISTS"
+    db.rollback()
+    db.refresh(restaurant)
+    assert restaurant.name == "锦川汇"
+    assert restaurant.status == "open"
+    assert restaurant.mcp_visible is True
+
+
+def test_send_test_order_sms_uses_active_restaurant_phone(db, monkeypatch):
+    restaurant = db.query(Restaurant).first()
+    db.add(
+        User(
+            phone="+61435394123",
+            email=None,
+            password_hash=hash_password("owner-pass"),
+            role="restaurant",
+            restaurant_id=restaurant.id,
+            is_active=True,
+        )
+    )
+    db.commit()
+    calls = []
+
+    def fake_send_sms(to_phone, body):
+        calls.append((to_phone, body))
+        return "SM_test"
+
+    monkeypatch.setattr(notifications, "_send_sms", fake_send_sms)
+
+    result = notifications.send_test_order_sms(db, restaurant.id)
+
+    assert result["ok"] is True
+    assert result["phone"] == "+61435394123"
+    assert calls == [
+        (
+            "+61435394123",
+            "Test MalaFlow order: 1x Sample dish. Open the workspace and assign a pickup number.",
+        )
+    ]
+
+
+def test_send_test_order_sms_requires_active_phone(db):
+    restaurant = db.query(Restaurant).first()
+
+    with pytest.raises(HTTPException) as exc:
+        notifications.send_test_order_sms(db, restaurant.id)
+
+    assert exc.value.detail == "NO_ACTIVE_RESTAURANT_PHONE"
+
+
+def test_hard_delete_restaurant_requires_exact_name_and_cleans_dependencies(db):
+    restaurant = db.query(Restaurant).first()
+    db.add(
+        User(
+            phone="+61400000005",
+            email=None,
+            password_hash=hash_password("owner-pass"),
+            role="restaurant",
+            restaurant_id=restaurant.id,
+            is_active=True,
+        )
+    )
+    order = create_submitted_order(db)
+    db.add(
+        McpCallLog(
+            tool_name="create_order",
+            restaurant_id=restaurant.id,
+            request_json={"restaurant_id": restaurant.id},
+            response_summary="submitted",
+            status="success",
+            latency_ms=12,
+        )
+    )
+    db.commit()
+
+    with pytest.raises(HTTPException) as exc:
+        admin.hard_delete_restaurant(db, restaurant.id, "wrong name")
+    assert exc.value.detail == "RESTAURANT_NAME_CONFIRMATION_MISMATCH"
+    assert db.get(Restaurant, restaurant.id) is not None
+
+    result = admin.hard_delete_restaurant(db, restaurant.id, "锦川汇")
+
+    assert result == {"ok": True}
+    assert db.get(Restaurant, restaurant.id) is None
+    assert db.query(User).filter(User.restaurant_id == restaurant.id).count() == 0
+    assert db.query(MenuItem).filter(MenuItem.restaurant_id == restaurant.id).count() == 0
+    assert db.query(Order).filter(Order.restaurant_id == restaurant.id).count() == 0
+    assert db.query(OrderItem).filter(OrderItem.order_id == order["id"]).count() == 0
+    log = db.query(McpCallLog).first()
+    assert log is not None
+    assert log.restaurant_id is None
+    assert log.request_json["restaurant_id"] == restaurant.id

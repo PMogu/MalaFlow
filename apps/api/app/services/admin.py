@@ -1,11 +1,11 @@
 import re
 
 from fastapi import HTTPException, status
+from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import McpCallLog, Order, Restaurant, User
+from app.models import McpCallLog, MenuItem, Order, OrderItem, Restaurant, User
 from app.schemas import CreateUserInput, RestaurantInput, RestaurantOnboardingInput, UpdateUserInput
 from app.security import hash_password
 from app.services.formatters import order_out, restaurant_out, user_out
@@ -99,6 +99,80 @@ def update_restaurant(db: Session, restaurant_id: str, payload: RestaurantInput)
     restaurant.mcp_visible = payload.mcp_visible
     restaurant.pickup_instructions = payload.pickup_instructions
     db.commit()
+    db.refresh(restaurant)
+    return restaurant_out(restaurant)
+
+
+def update_restaurant_and_account(
+    db: Session,
+    restaurant_id: str,
+    restaurant_payload: RestaurantInput,
+    account_payload: UpdateUserInput,
+) -> dict:
+    restaurant = get_restaurant_with_accounts(db, restaurant_id)
+    account = primary_account(restaurant)
+    phone = account_payload.phone.strip() if account_payload.phone else None
+    email = None
+    if account_payload.email is not None:
+        email = account_payload.email.strip() or None
+
+    if account:
+        if phone:
+            existing = db.scalar(select(User).where(User.phone == phone, User.id != account.id))
+            if existing:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="PHONE_EXISTS")
+        if email:
+            existing = db.scalar(select(User).where(User.email == email, User.id != account.id))
+            if existing:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="EMAIL_EXISTS")
+    else:
+        if not phone:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="PHONE_REQUIRED")
+        if not account_payload.password:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ACCOUNT_PASSWORD_REQUIRED")
+        if db.scalar(select(User).where(User.phone == phone)):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="PHONE_EXISTS")
+        if email and db.scalar(select(User).where(User.email == email)):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="EMAIL_EXISTS")
+
+    restaurant.name = restaurant_payload.name
+    restaurant.description = restaurant_payload.description
+    restaurant.location_text = restaurant_payload.location_text
+    restaurant.cuisine_tags = restaurant_payload.cuisine_tags
+    restaurant.service_modes = restaurant_payload.service_modes
+    restaurant.status = restaurant_payload.status
+    restaurant.mcp_visible = restaurant_payload.mcp_visible
+    restaurant.pickup_instructions = restaurant_payload.pickup_instructions
+
+    if account:
+        if phone:
+            account.phone = phone
+        if account_payload.email is not None:
+            account.email = email
+        if account_payload.password:
+            account.password_hash = hash_password(account_payload.password)
+        if account_payload.is_active is not None:
+            account.is_active = account_payload.is_active
+        account.role = "restaurant"
+        account.restaurant_id = restaurant.id
+    else:
+        db.add(
+            User(
+                phone=phone,
+                email=email,
+                password_hash=hash_password(account_payload.password or ""),
+                role="restaurant",
+                restaurant_id=restaurant.id,
+                is_active=account_payload.is_active if account_payload.is_active is not None else True,
+            )
+        )
+
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="ACCOUNT_IDENTIFIER_EXISTS") from exc
+
     db.refresh(restaurant)
     return restaurant_out(restaurant)
 
@@ -205,3 +279,29 @@ def list_mcp_logs(db: Session, limit: int = 100) -> list[dict]:
         }
         for log in logs
     ]
+
+
+def hard_delete_restaurant(db: Session, restaurant_id: str, confirmation_name: str) -> dict:
+    restaurant = db.get(Restaurant, restaurant_id)
+    if not restaurant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="RESTAURANT_NOT_FOUND")
+    if confirmation_name.strip() != restaurant.name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="RESTAURANT_NAME_CONFIRMATION_MISMATCH",
+        )
+
+    order_ids = db.scalars(select(Order.id).where(Order.restaurant_id == restaurant_id)).all()
+    try:
+        db.execute(update(McpCallLog).where(McpCallLog.restaurant_id == restaurant_id).values(restaurant_id=None))
+        if order_ids:
+            db.execute(delete(OrderItem).where(OrderItem.order_id.in_(order_ids)))
+        db.execute(delete(Order).where(Order.restaurant_id == restaurant_id))
+        db.execute(delete(MenuItem).where(MenuItem.restaurant_id == restaurant_id))
+        db.execute(delete(User).where(User.restaurant_id == restaurant_id))
+        db.delete(restaurant)
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="RESTAURANT_DELETE_BLOCKED") from exc
+    return {"ok": True}
