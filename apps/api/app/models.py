@@ -122,3 +122,42 @@ class McpCallLog(Base):
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     latency_ms: Mapped[int] = mapped_column(nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+
+class OAuthClient(Base, TimestampMixin):
+    __tablename__ = "oauth_clients"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("oauth_client"))
+    client_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    redirect_uris: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    grant_types: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    response_types: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    scope: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+
+class OAuthAuthorizationCode(Base):
+    __tablename__ = "oauth_authorization_codes"
+
+    code: Mapped[str] = mapped_column(String(160), primary_key=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("oauth_clients.id"), index=True, nullable=False)
+    redirect_uri: Mapped[str] = mapped_column(Text, nullable=False)
+    code_challenge: Mapped[str] = mapped_column(String(160), nullable=False)
+    code_challenge_method: Mapped[str] = mapped_column(String(16), default="S256", nullable=False)
+    scope: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    state: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    resource: Mapped[str | None] = mapped_column(Text, nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+
+class OAuthRefreshToken(Base):
+    __tablename__ = "oauth_refresh_tokens"
+
+    token: Mapped[str] = mapped_column(String(160), primary_key=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("oauth_clients.id"), index=True, nullable=False)
+    scope: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    resource: Mapped[str | None] = mapped_column(Text, nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)

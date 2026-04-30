@@ -8,7 +8,8 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.config import get_settings
 from app.database import Base, engine
 from app.mcp_server.server import create_mcp_server
-from app.routers import admin_console, auth, public, restaurant
+from app.routers import admin_console, auth, oauth, public, restaurant
+from app.services import oauth as oauth_service
 
 settings = get_settings()
 mcp_server = create_mcp_server()
@@ -43,10 +44,15 @@ app.add_middleware(
 @app.middleware("http")
 async def mcp_bearer_auth(request: Request, call_next):
     if request.url.path.startswith("/mcp") and request.method != "OPTIONS":
-        expected = settings.mcp_bearer_token
-        received = request.headers.get("authorization", "")
-        if expected and received != f"Bearer {expected}":
-            return JSONResponse({"error": "MCP_UNAUTHORIZED"}, status_code=401)
+        auth_header = request.headers.get("authorization", "")
+        token = auth_header[7:] if auth_header.lower().startswith("bearer ") else None
+        if not oauth_service.is_valid_mcp_bearer_token(token):
+            resource_metadata = oauth_service.protected_resource_metadata_url(request)
+            return JSONResponse(
+                {"error": "invalid_token", "error_description": "Authentication required"},
+                status_code=401,
+                headers={"WWW-Authenticate": f'Bearer resource_metadata="{resource_metadata}", scope="mcp"'},
+            )
     return await call_next(request)
 
 
@@ -56,6 +62,7 @@ def health() -> dict:
 
 
 app.include_router(auth.router)
+app.include_router(oauth.router)
 app.include_router(admin_console.router)
 app.include_router(restaurant.router)
 app.include_router(public.router)

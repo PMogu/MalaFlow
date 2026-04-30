@@ -41,7 +41,7 @@ Useful areas to help with:
 
 MalaFlow includes a `malaflow` ordering skill for compatible Agents. The skill tells the Agent to use only the MalaFlow MCP network for restaurant search, menu lookup, pickup ordering, and order status. If MalaFlow has no available result, the Agent should say so instead of searching the web for unrelated restaurants.
 
-To try it, install the skill from this repository, add the MalaFlow MCP server URL, and ask the pilot administrator for a MalaFlow Access Code.
+To try it, install the skill from this repository, add the MalaFlow MCP server URL, and ask the pilot administrator for a MalaFlow Access Code. OAuth-capable assistants can add the URL first and log in when prompted; older clients can still use the Access Code as a Bearer token.
 
 ## Project Shape
 

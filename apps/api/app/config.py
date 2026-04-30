@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     jwt_secret: str = Field(default="dev-secret-change-me", alias="JWT_SECRET")
     jwt_expires_minutes: int = Field(default=60 * 24 * 7, alias="JWT_EXPIRES_MINUTES")
     mcp_bearer_token: str = Field(default="dev-mcp-token", alias="MCP_BEARER_TOKEN")
+    mcp_oauth_access_token_minutes: int = Field(default=60, alias="MCP_OAUTH_ACCESS_TOKEN_MINUTES")
+    mcp_oauth_refresh_token_days: int = Field(default=30, alias="MCP_OAUTH_REFRESH_TOKEN_DAYS")
     admin_password: str = Field(default="dev-admin-pass", alias="ADMIN_PASSWORD")
     admin_session_secret: str = Field(default="dev-admin-session-secret", alias="ADMIN_SESSION_SECRET")
     cors_origins: str = Field(default="http://localhost:3000", alias="CORS_ORIGINS")

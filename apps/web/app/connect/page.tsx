@@ -35,7 +35,8 @@ export default function ConnectPage() {
           <h2>Add this server</h2>
           <code className="code-block">{MCP_URL}</code>
           <p className="muted">
-            You will need a MalaFlow Access Code, also called a Bearer token, from the pilot administrator.
+            Leave Bearer token empty. When your agent asks you to log in, enter the MalaFlow Access Code from the
+            pilot administrator.
           </p>
         </section>
         <section className="panel span-4 stack">
@@ -54,6 +55,24 @@ export default function ConnectPage() {
           paste this into AGENTS.md for that project:
         </p>
         <code className="code-block">{AGENTS_SNIPPET}</code>
+      </section>
+
+      <section className="panel stack">
+        <h2>OAuth login and fallback</h2>
+        <p className="muted">
+          OAuth-capable clients can add the server URL first, then choose Login or Authenticate when the client asks.
+          Codex CLI users can run:
+        </p>
+        <code className="code-block">
+          codex mcp add malaflow --url {MCP_URL}
+          {"\n"}
+          codex mcp login malaflow
+        </code>
+        <p className="muted">
+          If your client does not support OAuth login, configure the MalaFlow Access Code as a Bearer token instead.
+          If it asks for a token field, paste only the code. If it asks for a full authorization header, use
+          <code>Bearer &lt;MalaFlow Access Code&gt;</code>.
+        </p>
       </section>
     </main>
   );
