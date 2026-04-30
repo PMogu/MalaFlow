@@ -43,7 +43,8 @@ app.add_middleware(
 
 @app.middleware("http")
 async def mcp_bearer_auth(request: Request, call_next):
-    if request.url.path.startswith("/mcp") and request.method != "OPTIONS":
+    is_mcp_well_known = request.url.path.startswith("/mcp/.well-known/")
+    if request.url.path.startswith("/mcp") and request.method != "OPTIONS" and not is_mcp_well_known:
         auth_header = request.headers.get("authorization", "")
         token = auth_header[7:] if auth_header.lower().startswith("bearer ") else None
         if not oauth_service.is_valid_mcp_bearer_token(token):

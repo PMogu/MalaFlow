@@ -66,6 +66,7 @@ def client(monkeypatch):
     settings = get_settings()
     monkeypatch.setattr(settings, "mcp_bearer_token", "MALA_TEST_CODE")
     monkeypatch.setattr(settings, "app_env", "test")
+    monkeypatch.setattr(settings, "public_base_url", None)
     main.app.dependency_overrides[get_db] = override_db
     yield TestClient(main.app)
     main.app.dependency_overrides.clear()
@@ -86,15 +87,38 @@ def test_oauth_metadata_endpoints(client):
     resource = client.get("/.well-known/oauth-protected-resource/mcp")
     root_resource = client.get("/.well-known/oauth-protected-resource")
     auth_server = client.get("/.well-known/oauth-authorization-server")
+    scoped_auth_server = client.get("/.well-known/oauth-authorization-server/mcp")
+    mounted_auth_server = client.get("/mcp/.well-known/oauth-authorization-server")
 
     assert resource.status_code == 200
     assert root_resource.status_code == 200
     assert resource.json()["bearer_methods_supported"] == ["header"]
     assert resource.json()["authorization_servers"]
     assert auth_server.status_code == 200
+    assert scoped_auth_server.status_code == 200
+    assert mounted_auth_server.status_code == 200
     assert auth_server.json()["authorization_endpoint"].endswith("/oauth/authorize")
     assert auth_server.json()["token_endpoint"].endswith("/oauth/token")
     assert auth_server.json()["registration_endpoint"].endswith("/oauth/register")
+
+
+def test_oauth_metadata_uses_public_base_url(client):
+    settings = get_settings()
+    settings.public_base_url = "https://malaflow.example"
+
+    response = client.get("/.well-known/oauth-authorization-server")
+
+    assert response.status_code == 200
+    assert response.json()["issuer"] == "https://malaflow.example"
+    assert response.json()["registration_endpoint"] == "https://malaflow.example/oauth/register"
+
+
+def test_oauth_register_get_creates_loopback_client(client):
+    registration = client.get("/oauth/register")
+
+    assert registration.status_code == 201
+    assert registration.json()["client_id"].startswith("oauth_client_")
+    assert registration.json()["redirect_uris"] == ["*"]
 
 
 def test_oauth_pkce_flow_issues_valid_mcp_token(client):
@@ -140,6 +164,28 @@ def test_oauth_pkce_flow_issues_valid_mcp_token(client):
     assert token.status_code == 200
     access_token = token.json()["access_token"]
     assert main.oauth_service.is_valid_mcp_bearer_token(access_token)
+
+
+def test_oauth_get_registered_loopback_client_accepts_local_redirect(client):
+    verifier, challenge = pkce_pair()
+    registration = client.get("/oauth/register")
+    client_id = registration.json()["client_id"]
+
+    authorize = client.post(
+        "/oauth/authorize",
+        data={
+            "client_id": client_id,
+            "redirect_uri": "http://127.0.0.1:4321/callback",
+            "response_type": "code",
+            "code_challenge": challenge,
+            "code_challenge_method": "S256",
+            "scope": "mcp",
+            "access_code": "MALA_TEST_CODE",
+        },
+        follow_redirects=False,
+    )
+
+    assert authorize.status_code == 303
 
 
 def test_legacy_bearer_token_still_valid_for_mcp(client):

@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     database_url: str = Field(default="sqlite:///./restaurant_skill_loop.sqlite", alias="DATABASE_URL")
     jwt_secret: str = Field(default="dev-secret-change-me", alias="JWT_SECRET")
     jwt_expires_minutes: int = Field(default=60 * 24 * 7, alias="JWT_EXPIRES_MINUTES")
+    public_base_url: str | None = Field(default=None, alias="PUBLIC_BASE_URL")
     mcp_bearer_token: str = Field(default="dev-mcp-token", alias="MCP_BEARER_TOKEN")
     mcp_oauth_access_token_minutes: int = Field(default=60, alias="MCP_OAUTH_ACCESS_TOKEN_MINUTES")
     mcp_oauth_refresh_token_days: int = Field(default=30, alias="MCP_OAUTH_REFRESH_TOKEN_DAYS")

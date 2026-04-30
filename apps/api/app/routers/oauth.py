@@ -80,6 +80,11 @@ def protected_resource_metadata(request: Request) -> dict:
 
 
 @router.get("/.well-known/oauth-authorization-server")
+@router.get("/.well-known/oauth-authorization-server/mcp")
+@router.get("/.well-known/openid-configuration")
+@router.get("/.well-known/openid-configuration/mcp")
+@router.get("/mcp/.well-known/oauth-authorization-server")
+@router.get("/mcp/.well-known/openid-configuration")
 def authorization_server_metadata(request: Request) -> dict:
     issuer = oauth_service.issuer_url(request)
     return {
@@ -99,6 +104,11 @@ def authorization_server_metadata(request: Request) -> dict:
 async def register_client(request: Request, db: Session = Depends(get_db)) -> JSONResponse:
     payload = await request.json()
     return JSONResponse(oauth_service.register_client(db, payload), status_code=status.HTTP_201_CREATED)
+
+
+@router.get("/oauth/register")
+def register_loopback_client(db: Session = Depends(get_db)) -> JSONResponse:
+    return JSONResponse(oauth_service.register_loopback_client(db), status_code=status.HTTP_201_CREATED)
 
 
 @router.get("/oauth/authorize", response_class=HTMLResponse)

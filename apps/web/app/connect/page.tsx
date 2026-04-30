@@ -32,11 +32,11 @@ export default function ConnectPage() {
         </section>
         <section className="panel span-4 stack">
           <p className="eyebrow">Step 2</p>
-          <h2>Add this server</h2>
+          <h2>Add URL and Bearer token</h2>
           <code className="code-block">{MCP_URL}</code>
           <p className="muted">
-            Leave Bearer token empty. When your agent asks you to log in, enter the MalaFlow Access Code from the
-            pilot administrator.
+            Ask the pilot administrator for the MalaFlow Access Code. If your client has a Bearer token field, paste
+            only the code. If it asks for headers, add <code>Authorization: Bearer &lt;MalaFlow Access Code&gt;</code>.
           </p>
         </section>
         <section className="panel span-4 stack">
@@ -58,20 +58,14 @@ export default function ConnectPage() {
       </section>
 
       <section className="panel stack">
-        <h2>OAuth login and fallback</h2>
+        <h2>Optional OAuth login</h2>
         <p className="muted">
-          OAuth-capable clients can add the server URL first, then choose Login or Authenticate when the client asks.
-          Codex CLI users can run:
+          Some clients can start an OAuth login after you add the server URL. If a login page opens, enter the same
+          MalaFlow Access Code from the pilot administrator. Codex CLI users can try:
         </p>
-        <code className="code-block">
-          codex mcp add malaflow --url {MCP_URL}
-          {"\n"}
-          codex mcp login malaflow
-        </code>
+        <code className="code-block">codex mcp add malaflow --url {MCP_URL}</code>
         <p className="muted">
-          If your client does not support OAuth login, configure the MalaFlow Access Code as a Bearer token instead.
-          If it asks for a token field, paste only the code. If it asks for a full authorization header, use
-          <code>Bearer &lt;MalaFlow Access Code&gt;</code>.
+          If login does not start automatically, run <code>codex mcp login malaflow</code>.
         </p>
       </section>
     </main>

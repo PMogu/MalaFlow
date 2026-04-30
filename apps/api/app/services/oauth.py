@@ -4,7 +4,7 @@ import base64
 import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 import jwt
 from fastapi import HTTPException, Request, status
@@ -22,6 +22,9 @@ def utcnow() -> datetime:
 
 
 def issuer_url(request: Request) -> str:
+    settings = get_settings()
+    if settings.public_base_url:
+        return settings.public_base_url.rstrip("/")
     return str(request.base_url).rstrip("/")
 
 
@@ -63,6 +66,28 @@ def register_client(db: Session, payload: dict) -> dict:
     }
 
 
+def register_loopback_client(db: Session) -> dict:
+    return register_client(
+        db,
+        {
+            "client_name": "MalaFlow OAuth Client",
+            "redirect_uris": ["*"],
+            "grant_types": ["authorization_code", "refresh_token"],
+            "response_types": ["code"],
+            "scope": OAUTH_SCOPE,
+        },
+    )
+
+
+def redirect_uri_allowed(client: OAuthClient, redirect_uri: str) -> bool:
+    if redirect_uri in client.redirect_uris:
+        return True
+    if "*" not in client.redirect_uris:
+        return False
+    parsed = urlparse(redirect_uri)
+    return parsed.scheme == "http" and parsed.hostname in {"127.0.0.1", "localhost", "::1"}
+
+
 def validate_authorize_request(
     db: Session,
     client_id: str,
@@ -76,7 +101,7 @@ def validate_authorize_request(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="UNKNOWN_OAUTH_CLIENT")
     if response_type != "code":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="UNSUPPORTED_RESPONSE_TYPE")
-    if redirect_uri not in client.redirect_uris:
+    if not redirect_uri_allowed(client, redirect_uri):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="INVALID_REDIRECT_URI")
     if not code_challenge or code_challenge_method != "S256":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="PKCE_S256_REQUIRED")

@@ -8,6 +8,18 @@ The experiment is simple: a user asks an Agent for food near campus, the Agent c
 User -> Agent -> MCP -> Restaurant workspace -> pickup number -> Agent -> User
 ```
 
+## We Need You & Contact
+
+We are currently looking for:
+
+- Food lovers willing to test agent-assisted ordering and tell us how it feels
+- Partner restaurants near Unimelb who want to try a lightweight AI ordering channel.
+- Engineers interested in helping push the product, MCP integration, restaurant workflow, or reliability forward.
+- General advice from people with experience in restaurants, campus pilots, local growth, or agentic AI developing.
+
+👉 Email us: malaflow_dev@outlook.com  
+👉 Join our Discord: https://discord.gg/MJR7ZDgFDs
+
 ## Why This Exists
 
 Ordering interfaces are usually built as apps. MalaFlow explores a different question:
@@ -52,29 +64,6 @@ To try it, install the skill from this repository, add the MalaFlow MCP server U
 - `docs/USER_GUIDE.md`: Public usage guide.
 
 Internal deployment notes, Railway details, and experiment planning docs are intentionally kept out of the public repository.
-
-## Local Development
-
-```bash
-cp .env.example .env
-
-cd apps/api
-python -m venv .venv
-. .venv/bin/activate
-pip install -e ".[dev]"
-alembic upgrade head
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
-```
-
-In another shell:
-
-```bash
-cd apps/web
-npm install
-npm run dev
-```
-
-Restaurant accounts are created through the internal admin console. Restaurant staff log in with phone number and password.
 
 ## Status
 
