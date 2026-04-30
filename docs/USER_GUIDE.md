@@ -19,16 +19,17 @@ The user's Agent can then check the order status and tell the user the pickup nu
 
 ## For People Ordering Through An AI Assistant
 
-1. Open an AI assistant that supports MCP tools.
-2. Add the MalaFlow MCP server URL shared by the pilot team.
-3. Add the pilot access token when the assistant asks for authorization.
-4. Try a prompt like:
+1. Install the `malaflow` ordering skill from the MalaFlow GitHub repository.
+2. Open an AI assistant that supports MCP tools.
+3. Add the MalaFlow MCP server URL shared by the pilot team.
+4. Add the MalaFlow Access Code, also called a Bearer token, when the assistant asks for authorization.
+5. Start with a prompt like:
 
 ```text
-I want beef noodles near Unimelb. Can you help me order pickup?
+Use the MalaFlow skill. I want something hot near Unimelb for pickup. Can you help me order?
 ```
 
-The Agent should recommend a restaurant or dish, ask for confirmation before ordering, create the order, and later check for the pickup number.
+The Agent should use MalaFlow tools only, recommend a restaurant or dish, ask for confirmation before ordering, create the order, and later check for the pickup number. If MalaFlow has no available restaurant or matching menu item, the Agent should tell you instead of searching the web.
 
 ## Order States
 

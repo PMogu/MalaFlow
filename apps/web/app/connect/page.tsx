@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 const MCP_URL = "https://restaurant-skill-loop-api-production.up.railway.app/mcp/";
+const GITHUB_URL = "https://github.com/PMogu/MalaFlow";
 
 export default function ConnectPage() {
   return (
@@ -18,30 +19,30 @@ export default function ConnectPage() {
       <section className="grid">
         <section className="panel span-4 stack">
           <p className="eyebrow">Step 1</p>
-          <h2>Open an MCP-capable assistant</h2>
-          <p className="muted">Use Codex, Claude, Cursor, Continue, or another client that can add an HTTP MCP server.</p>
+          <h2>Install the MalaFlow Ordering Skill</h2>
+          <p className="muted">
+            Install the MalaFlow Ordering Skill from GitHub:{" "}
+            <a href={GITHUB_URL} target="_blank" rel="noreferrer">
+              {GITHUB_URL}
+            </a>
+          </p>
+          <p className="muted">If you don&apos;t know where to put the file, ask your agent.</p>
         </section>
         <section className="panel span-4 stack">
           <p className="eyebrow">Step 2</p>
           <h2>Add this server</h2>
           <code className="code-block">{MCP_URL}</code>
-          <p className="muted">Use your pilot access token as a Bearer token when the client asks for authorization.</p>
+          <p className="muted">
+            You will need a MalaFlow Access Code, also called a Bearer token, from the pilot administrator.
+          </p>
         </section>
         <section className="panel span-4 stack">
           <p className="eyebrow">Step 3</p>
-          <h2>Try a campus pickup prompt</h2>
-          <code className="code-block">I want beef noodles near Unimelb. Can you help me order pickup?</code>
+          <h2>Start with the skill</h2>
+          <code className="code-block">
+            Use the MalaFlow skill. I want something hot near Unimelb for pickup. Can you help me order?
+          </code>
         </section>
-      </section>
-
-      <section className="panel stack">
-        <h2>Codex CLI</h2>
-        <code className="code-block">
-          export RESTAURANT_MCP_BEARER_TOKEN=&quot;&lt;pilot access token&gt;&quot;{"\n"}
-          codex mcp add malaflow --url {MCP_URL} --bearer-token-env-var
-          RESTAURANT_MCP_BEARER_TOKEN{"\n"}
-          codex mcp list
-        </code>
       </section>
     </main>
   );

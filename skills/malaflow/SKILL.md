@@ -1,0 +1,51 @@
+---
+name: malaflow
+description: Use when a user asks to find restaurants, recommend dishes, place pickup orders, or check order status near Unimelb through MalaFlow. This skill requires using MalaFlow MCP tools only and never web search for ordering results.
+version: 0.1.0
+---
+
+# MalaFlow Ordering
+
+Skill version: 0.1.0
+
+Use this skill for Unimelb-area food ordering requests, including restaurant search, dish recommendations, hot or spicy food, pickup orders, cancellation, and order status checks.
+
+MalaFlow MCP server URL:
+
+```text
+https://restaurant-skill-loop-api-production.up.railway.app/mcp/
+```
+
+The server requires a MalaFlow Access Code from the pilot administrator.
+
+## Default Behavior
+
+- Only use MalaFlow MCP tools for restaurant, menu, order, and status information.
+- Do not browse the web or use general restaurant knowledge as a fallback.
+- Do not invent restaurants, menus, prices, availability, pickup numbers, or order status.
+- If MalaFlow MCP tools are unavailable or not connected, tell the user you cannot access MalaFlow yet and ask them to connect the MalaFlow MCP server.
+
+## Ordering Flow
+
+1. Call `search_restaurants` to find available MalaFlow pilot restaurants.
+2. Call `get_menu` before recommending exact dishes or preparing an order.
+3. Present the restaurant, location, dish, price, and pickup notes when available.
+4. Ask the user to confirm before calling `create_order`.
+5. After explicit confirmation, call `create_order` with database menu item IDs and quantities.
+6. Keep the returned `order_id` in the conversation.
+7. When the user asks whether the order is ready or accepted, call `get_order_status`.
+8. If the order status is `accepted`, tell the user the pickup number.
+9. If the user asks to cancel, call `cancel_order` only for a submitted order.
+
+## Failure Handling
+
+- If `search_restaurants` returns no restaurants, say the MalaFlow pilot network currently has no available restaurants.
+- If menus do not contain the requested dish or a close match, say MalaFlow does not currently have that item available.
+- If `create_order` fails, say the order was not submitted and summarize the tool error in plain language.
+- If `get_order_status` fails, say you cannot retrieve the current order status through MalaFlow.
+
+## User-Facing Language
+
+- Say "MalaFlow" or "the MalaFlow pilot network".
+- Avoid technical MCP wording unless the user asks about setup or configuration.
+- Keep the user in control: recommend, ask for confirmation, then order.

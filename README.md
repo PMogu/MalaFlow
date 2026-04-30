@@ -37,10 +37,17 @@ Useful areas to help with:
 - Backend reliability, notifications, and observability.
 - Agent prompt/tool behavior.
 
+## For People Ordering Through An Agent
+
+MalaFlow includes a `malaflow` ordering skill for compatible Agents. The skill tells the Agent to use only the MalaFlow MCP network for restaurant search, menu lookup, pickup ordering, and order status. If MalaFlow has no available result, the Agent should say so instead of searching the web for unrelated restaurants.
+
+To try it, install the skill from this repository, add the MalaFlow MCP server URL, and ask the pilot administrator for a MalaFlow Access Code.
+
 ## Project Shape
 
 - `apps/api`: FastAPI, PostgreSQL, SQLAlchemy, Alembic, MCP endpoint, internal admin console.
 - `apps/web`: Next.js restaurant workspace and public MCP connection guide.
+- `skills/malaflow`: Agent instructions for MalaFlow-only ordering behavior.
 - `docs/MVP.md`: MVP behavior and order flow.
 - `docs/USER_GUIDE.md`: Public usage guide.
 
