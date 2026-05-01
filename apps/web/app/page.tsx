@@ -2,7 +2,7 @@ import Link from "next/link";
 import { RestaurantLoginForm } from "@/components/RestaurantLoginForm";
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "https://restaurant-skill-loop-api-production.up.railway.app";
+  process.env.NEXT_PUBLIC_API_BASE_URL || "https://api.malaflow.com";
 
 export default function Home() {
   return (

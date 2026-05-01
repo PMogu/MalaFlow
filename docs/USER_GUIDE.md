@@ -21,10 +21,10 @@ The user's Agent can then check the order status and tell the user the pickup nu
 
 1. Install the `malaflow` ordering skill from the MalaFlow GitHub repository.
 2. Open an AI assistant that supports MCP tools.
-3. Add the MalaFlow MCP server URL shared by the pilot team.
-4. If the assistant supports OAuth login, leave the Bearer token field empty and log in when prompted.
-5. Enter the MalaFlow Access Code from the pilot administrator on the MalaFlow login page.
-6. If the assistant does not support OAuth login, paste the MalaFlow Access Code into its Bearer token field instead.
+3. Add the MalaFlow MCP server URL: `https://api.malaflow.com/mcp/`.
+4. Ask the pilot administrator for a MalaFlow Access Code.
+5. If the assistant has a Bearer token field, paste only the code. If it asks for headers, add `Authorization: Bearer <MalaFlow Access Code>`.
+6. If the assistant starts an OAuth login instead, enter the same MalaFlow Access Code on the MalaFlow login page.
 7. Start with a prompt like:
 
 ```text

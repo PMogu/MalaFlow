@@ -33,4 +33,4 @@ submitted -> rejected
 
 All tools call backend service functions and write to `mcp_call_logs`.
 
-The deployed Streamable HTTP URL uses the mounted ASGI path `/mcp/`.
+The deployed Streamable HTTP URL is `https://api.malaflow.com/mcp/`.

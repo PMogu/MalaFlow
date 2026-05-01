@@ -33,7 +33,7 @@ def tool_payload(result: Any) -> dict:
 
 
 async def main() -> None:
-    base_url = os.getenv("API_BASE_URL", "https://restaurant-skill-loop-api-production.up.railway.app").rstrip("/")
+    base_url = os.getenv("API_BASE_URL", "https://api.malaflow.com").rstrip("/")
     token = os.environ["MCP_BEARER_TOKEN"]
     restaurant_phone = os.environ["SMOKE_RESTAURANT_PHONE"]
     restaurant_password = os.environ["SMOKE_RESTAURANT_PASSWORD"]

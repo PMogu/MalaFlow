@@ -18,6 +18,4 @@ coverage/
 *.log
 
 # Internal pilot/deployment notes are kept locally and not published.
-docs/DEPLOYMENT.md
-docs/experiment_scheme.md
 docs/internal/

@@ -1,10 +1,10 @@
-const RAILWAY_API_BASE_URL = "https://restaurant-skill-loop-api-production.up.railway.app";
+const PRODUCTION_API_BASE_URL = "https://api.malaflow.com";
 
 export function getApiBaseUrl() {
   if (process.env.NEXT_PUBLIC_API_BASE_URL) {
     return process.env.NEXT_PUBLIC_API_BASE_URL;
   }
-  return RAILWAY_API_BASE_URL;
+  return PRODUCTION_API_BASE_URL;
 }
 
 export type User = {

@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-const MCP_URL = "https://restaurant-skill-loop-api-production.up.railway.app/mcp/";
+const MCP_URL = "https://api.malaflow.com/mcp/";
 const GITHUB_URL = "https://github.com/PMogu/MalaFlow";
 const AGENTS_SNIPPET =
   "For Unimelb food ordering, pickup, restaurant search, menu recommendations, and order status, use the malaflow skill. Only use MalaFlow MCP tools; do not browse the web for ordering results. If MalaFlow is unavailable or has no match, tell the user directly.";

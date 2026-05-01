@@ -13,7 +13,7 @@ Use this skill for Unimelb-area food ordering requests, including restaurant sea
 MalaFlow MCP server URL:
 
 ```text
-https://restaurant-skill-loop-api-production.up.railway.app/mcp/
+https://api.malaflow.com/mcp/
 ```
 
 The server requires a MalaFlow Access Code from the pilot administrator.
