@@ -4,7 +4,15 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch, setRestaurantToken, User } from "@/lib/api";
 
-export function RestaurantLoginForm() {
+type RestaurantLoginFormProps = {
+  footerLink?: {
+    href: string;
+    label: string;
+  };
+  id?: string;
+};
+
+export function RestaurantLoginForm({ footerLink, id }: RestaurantLoginFormProps = {}) {
   const router = useRouter();
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
@@ -30,7 +38,7 @@ export function RestaurantLoginForm() {
   }
 
   return (
-    <form className="panel login-panel stack" onSubmit={submit}>
+    <form className="panel login-panel stack" id={id} onSubmit={submit}>
       <div>
         <p className="eyebrow">MalaFlow login</p>
         <h2>Open the pickup queue</h2>
@@ -62,6 +70,11 @@ export function RestaurantLoginForm() {
       <button className="button primary" disabled={loading} type="submit">
         {loading ? "Signing in" : "Sign in"}
       </button>
+      {footerLink ? (
+        <a className="login-card-link" href={footerLink.href}>
+          {footerLink.label}
+        </a>
+      ) : null}
     </form>
   );
 }
