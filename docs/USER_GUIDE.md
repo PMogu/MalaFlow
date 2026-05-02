@@ -25,10 +25,10 @@ The user's Agent can then check the order status and tell the user the pickup nu
 4. Start with this prompt:
 
 ```text
-Use the malaflow skill. I want something hot near Unimelb for pickup. Please search MalaFlow, help me confirm an order, then wait for the pickup number or rejection result.
+Use the malaflow skill. I want something hot near Unimelb for pickup. Only use MalaFlow tools, do not browse the web. Please search MalaFlow, help me confirm an order, then wait for the pickup number or rejection result.
 ```
 
-The Agent should use MalaFlow tools only, recommend a restaurant or dish, ask for confirmation before ordering, create the order, then wait for a pickup number or rejection result. If MalaFlow has no available restaurant or matching menu item, the Agent should tell you instead of searching the web.
+The Agent should use MalaFlow tools only, recommend a restaurant or dish, ask for confirmation before ordering, and prefer `create_order_and_wait` so the order result comes back in one flow. If MalaFlow has no available restaurant or matching menu item, the Agent should tell you instead of searching the web.
 
 For Codex, Cursor, Claude, Continue, or other MCP clients, install the `malaflow` ordering skill from the GitHub repository, add the same MCP URL manually, and use the Access Code as a Bearer token if the client asks for one.
 

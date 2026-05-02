@@ -51,6 +51,7 @@ async def main() -> None:
                     "get_restaurant_detail",
                     "get_menu",
                     "create_order",
+                    "create_order_and_wait",
                     "get_order_status",
                     "cancel_order",
                 }

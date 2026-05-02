@@ -3,7 +3,7 @@ import Link from "next/link";
 const MCP_URL = "https://api.malaflow.com/mcp/";
 const GITHUB_URL = "https://github.com/PMogu/MalaFlow";
 const FIRST_PROMPT =
-  "Use the malaflow skill. I want something hot near Unimelb for pickup. Please search MalaFlow, help me confirm an order, then wait for the pickup number or rejection result.";
+  "Use the malaflow skill. I want something hot near Unimelb for pickup. Only use MalaFlow tools, do not browse the web. Please search MalaFlow, help me confirm an order, then wait for the pickup number or rejection result.";
 
 export default function ConnectPage() {
   return (

@@ -29,10 +29,12 @@ If an order remains `submitted` for 5 minutes after creation, MalaFlow automatic
 - `get_restaurant_detail`
 - `get_menu`
 - `create_order`
+- `create_order_and_wait`
 - `get_order_status`
 - `wait_for_order_result`
 - `cancel_order`
 
 All tools call backend service functions and write to `mcp_call_logs`.
+For normal ChatGPT ordering, `create_order_and_wait` is the preferred write tool because it creates the order and returns the pickup number, rejection, or cancellation result in one flow.
 
 The deployed Streamable HTTP URL is `https://api.malaflow.com/mcp/`.
