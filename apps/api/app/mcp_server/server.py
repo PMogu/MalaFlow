@@ -1,7 +1,7 @@
 from mcp.server.fastmcp import FastMCP
 
 from app.mcp_server import tool_handlers
-from app.services.mcp_logging import run_logged_tool
+from app.services.mcp_logging import run_logged_tool, run_logged_tool_without_db
 
 
 def create_mcp_server() -> FastMCP:
@@ -58,6 +58,14 @@ def create_mcp_server() -> FastMCP:
         """Get current order status, user-facing message, and pickup number if accepted."""
         request = {"order_id": order_id}
         return run_logged_tool("get_order_status", request, lambda db: tool_handlers.get_order_status(db, order_id))
+
+    @mcp.tool()
+    def wait_for_order_result(order_id: str) -> dict:
+        """Wait up to 5 minutes for a pickup number, rejection, or cancellation after order creation."""
+        request = {"order_id": order_id}
+        return run_logged_tool_without_db(
+            "wait_for_order_result", request, lambda: tool_handlers.wait_for_order_result(order_id)
+        )
 
     @mcp.tool()
     def cancel_order(order_id: str, reason: str | None = None) -> dict:

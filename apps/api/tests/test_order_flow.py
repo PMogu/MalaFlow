@@ -1,4 +1,5 @@
 from decimal import Decimal
+from datetime import timedelta
 
 import pytest
 from fastapi import HTTPException
@@ -6,7 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.database import Base
-from app.models import McpCallLog, MenuItem, Order, OrderItem, Restaurant, User
+from app.models import McpCallLog, MenuItem, Order, OrderItem, Restaurant, User, utcnow
 from app.schemas import (
     CreateOrderInput,
     OrderItemInput,
@@ -106,6 +107,84 @@ def test_cancel_and_reject_only_from_submitted(db):
     with pytest.raises(HTTPException) as reject_exc:
         orders.reject_order(db, accepted["id"], accepted["restaurant_id"], "Too late")
     assert reject_exc.value.detail == "INVALID_ORDER_STATE"
+
+
+def test_submitted_order_auto_rejects_after_five_minutes(db):
+    order = create_submitted_order(db)
+    stored = db.get(Order, order["id"])
+    stored.created_at = utcnow() - timedelta(seconds=orders.ORDER_AUTO_REJECT_SECONDS + 1)
+    db.commit()
+
+    status_result = orders.get_order_status(db, order["id"])
+
+    assert status_result["status"] == "rejected"
+    assert status_result["reject_reason"] == orders.AUTO_REJECT_REASON
+    assert orders.AUTO_REJECT_REASON in status_result["status_message"]
+
+    with pytest.raises(HTTPException) as cancel_exc:
+        orders.cancel_order(db, order["id"])
+    assert cancel_exc.value.detail == "INVALID_ORDER_STATE"
+    with pytest.raises(HTTPException) as accept_exc:
+        orders.accept_order(db, order["id"], order["restaurant_id"], "A18")
+    assert accept_exc.value.detail == "INVALID_ORDER_STATE"
+    with pytest.raises(HTTPException) as reject_exc:
+        orders.reject_order(db, order["id"], order["restaurant_id"], "Manual reject")
+    assert reject_exc.value.detail == "INVALID_ORDER_STATE"
+
+
+def test_accepted_order_is_not_auto_rejected(db):
+    order = create_submitted_order(db)
+    accepted = orders.accept_order(db, order["id"], order["restaurant_id"], "B09")
+    stored = db.get(Order, accepted["id"])
+    stored.created_at = utcnow() - timedelta(seconds=orders.ORDER_AUTO_REJECT_SECONDS + 1)
+    db.commit()
+
+    status_result = orders.get_order_status(db, order["id"])
+
+    assert status_result["status"] == "accepted"
+    assert status_result["order_number"] == "B09"
+
+
+def test_wait_for_order_result_returns_accepted_without_real_sleep(db):
+    order = create_submitted_order(db)
+    Session = sessionmaker(bind=db.get_bind(), expire_on_commit=False)
+    sleep_calls = []
+
+    def fake_sleep(seconds):
+        sleep_calls.append(seconds)
+        session = Session()
+        try:
+            orders.accept_order(session, order["id"], order["restaurant_id"], "C12")
+        finally:
+            session.close()
+
+    result = orders.wait_for_order_result(
+        order["id"],
+        poll_seconds=10,
+        timeout_seconds=60,
+        sleep_fn=fake_sleep,
+        session_factory=Session,
+    )
+
+    assert sleep_calls == [10]
+    assert result["status"] == "accepted"
+    assert result["order_number"] == "C12"
+
+
+def test_wait_for_order_result_auto_rejects_after_timeout_without_real_sleep(db):
+    order = create_submitted_order(db)
+    Session = sessionmaker(bind=db.get_bind(), expire_on_commit=False)
+
+    result = orders.wait_for_order_result(
+        order["id"],
+        poll_seconds=10,
+        timeout_seconds=0,
+        sleep_fn=lambda _seconds: None,
+        session_factory=Session,
+    )
+
+    assert result["status"] == "rejected"
+    assert result["reject_reason"] == orders.AUTO_REJECT_REASON
 
 
 def test_admin_onboarding_creates_restaurant_account_binding(db):

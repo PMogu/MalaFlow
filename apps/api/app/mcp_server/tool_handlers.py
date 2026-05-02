@@ -65,6 +65,18 @@ def get_order_status(db: Session, order_id: str) -> dict:
     }
 
 
+def wait_for_order_result(order_id: str) -> dict:
+    order = order_service.wait_for_order_result(order_id)
+    return {
+        "order_id": order["id"],
+        "status": order["status"],
+        "restaurant_id": order["restaurant_id"],
+        "order_number": order["order_number"],
+        "updated_at": order["updated_at"],
+        "message": order["status_message"],
+    }
+
+
 def cancel_order(db: Session, order_id: str, reason: str | None = None) -> dict:
     payload = CancelOrderInput(reason=reason)
     order = order_service.cancel_order(db, order_id, payload.reason)

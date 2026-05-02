@@ -10,7 +10,7 @@ Restaurants may enter a free-text location so Agents can tell users where the re
 - `submitted`: Agent has placed the order and the restaurant has not processed it yet.
 - `accepted`: Restaurant staff accepted the order and assigned an `order_number`.
 - `cancelled`: User cancelled a submitted order through the Agent.
-- `rejected`: Restaurant staff rejected a submitted order.
+- `rejected`: Restaurant staff rejected a submitted order, or no pickup number was assigned within 5 minutes.
 
 Allowed transitions:
 
@@ -21,6 +21,7 @@ submitted -> rejected
 ```
 
 `accepted` requires `order_number`.
+If an order remains `submitted` for 5 minutes after creation, MalaFlow automatically changes it to `rejected` with the reason `No pickup number was assigned within 5 minutes.`
 
 ## MCP Tools
 
@@ -29,6 +30,7 @@ submitted -> rejected
 - `get_menu`
 - `create_order`
 - `get_order_status`
+- `wait_for_order_result`
 - `cancel_order`
 
 All tools call backend service functions and write to `mcp_call_logs`.

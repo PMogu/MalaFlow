@@ -2,8 +2,8 @@ import Link from "next/link";
 
 const MCP_URL = "https://api.malaflow.com/mcp/";
 const GITHUB_URL = "https://github.com/PMogu/MalaFlow";
-const AGENTS_SNIPPET =
-  "For Unimelb food ordering, pickup, restaurant search, menu recommendations, and order status, use the malaflow skill. Only use MalaFlow MCP tools; do not browse the web for ordering results. If MalaFlow is unavailable or has no match, tell the user directly.";
+const FIRST_PROMPT =
+  "Use the malaflow skill. I want something hot near Unimelb for pickup. Please search MalaFlow, help me confirm an order, then wait for the pickup number or rejection result.";
 
 export default function ConnectPage() {
   return (
@@ -19,53 +19,42 @@ export default function ConnectPage() {
       </section>
 
       <section className="grid">
-        <section className="panel span-4 stack">
-          <p className="eyebrow">Step 1</p>
-          <h2>Install the MalaFlow Ordering Skill</h2>
+        <section className="panel span-8 stack">
+          <p className="eyebrow">Main path</p>
+          <h2>Connect with ChatGPT</h2>
           <p className="muted">
-            Install the MalaFlow Ordering Skill from GitHub:{" "}
-            <a href={GITHUB_URL} target="_blank" rel="noreferrer">
-              {GITHUB_URL}
-            </a>
+            Add MalaFlow as a custom MCP server in ChatGPT. Paste this server URL:
           </p>
-          <p className="muted">If you don&apos;t know where to put the file, ask your agent.</p>
-        </section>
-        <section className="panel span-4 stack">
-          <p className="eyebrow">Step 2</p>
-          <h2>Add URL and Bearer token</h2>
           <code className="code-block">{MCP_URL}</code>
           <p className="muted">
-            Ask the pilot administrator for the MalaFlow Access Code. If your client has a Bearer token field, paste
-            only the code. If it asks for headers, add <code>Authorization: Bearer &lt;MalaFlow Access Code&gt;</code>.
+            When the MalaFlow login page opens, enter the Access Code provided by the pilot administrator. ChatGPT
+            will then attach the required authorization automatically.
           </p>
         </section>
         <section className="panel span-4 stack">
-          <p className="eyebrow">Step 3</p>
-          <h2>Start with the skill</h2>
-          <code className="code-block">
-            Use the MalaFlow skill. I want something hot near Unimelb for pickup. Can you help me order?
-          </code>
+          <p className="eyebrow">First prompt</p>
+          <h2>Start with malaflow</h2>
+          <code className="code-block">{FIRST_PROMPT}</code>
+          <p className="muted">
+            For the same agent, this first prompt is usually enough. After that, you can describe food requests
+            naturally.
+          </p>
         </section>
       </section>
 
       <section className="panel stack">
-        <h2>Use it once per agent</h2>
+        <h2>Other agents</h2>
         <p className="muted">
-          If you keep using the same agent, you usually only need to mention the malaflow skill once. You can also
-          paste this into AGENTS.md for that project:
+          For Codex, Cursor, Claude, Continue, or other MCP clients, install the MalaFlow Ordering Skill from GitHub:
+          {" "}
+          <a href={GITHUB_URL} target="_blank" rel="noreferrer">
+            {GITHUB_URL}
+          </a>
+          .
         </p>
-        <code className="code-block">{AGENTS_SNIPPET}</code>
-      </section>
-
-      <section className="panel stack">
-        <h2>Optional OAuth login</h2>
         <p className="muted">
-          Some clients can start an OAuth login after you add the server URL. If a login page opens, enter the same
-          MalaFlow Access Code from the pilot administrator. Codex CLI users can try:
-        </p>
-        <code className="code-block">codex mcp add malaflow --url {MCP_URL}</code>
-        <p className="muted">
-          If login does not start automatically, run <code>codex mcp login malaflow</code>.
+          Add the same MCP URL manually. If your client asks for a Bearer token, paste only the Access Code. If it asks
+          for headers, add <code>Authorization: Bearer &lt;MalaFlow Access Code&gt;</code>.
         </p>
       </section>
     </main>

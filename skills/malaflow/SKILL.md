@@ -1,12 +1,12 @@
 ---
 name: malaflow
 description: Use when a user asks to find restaurants, recommend dishes, place pickup orders, or check order status near Unimelb through MalaFlow. This skill requires using MalaFlow MCP tools only and never web search for ordering results.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # MalaFlow Ordering
 
-Skill version: 0.1.0
+Skill version: 0.2.0
 
 Use this skill for Unimelb-area food ordering requests, including restaurant search, dish recommendations, hot or spicy food, pickup orders, cancellation, and order status checks.
 
@@ -33,9 +33,12 @@ The server requires a MalaFlow Access Code from the pilot administrator.
 4. Ask the user to confirm before calling `create_order`.
 5. After explicit confirmation, call `create_order` with database menu item IDs and quantities.
 6. Keep the returned `order_id` in the conversation.
-7. When the user asks whether the order is ready or accepted, call `get_order_status`.
-8. If the order status is `accepted`, tell the user the pickup number.
-9. If the user asks to cancel, call `cancel_order` only for a submitted order.
+7. Immediately call `wait_for_order_result` after `create_order`.
+8. `wait_for_order_result` waits up to 5 minutes, polling every 10 seconds, until the restaurant accepts with a pickup number, rejects, or the order is cancelled.
+9. If `wait_for_order_result` returns `accepted`, tell the user the pickup number.
+10. If it returns `rejected` or `cancelled`, tell the user plainly.
+11. If `wait_for_order_result` is unavailable, fallback to calling `get_order_status` every 10 seconds for up to 5 minutes.
+12. If the user asks to cancel before acceptance, call `cancel_order` only for a submitted order.
 
 ## Failure Handling
 
@@ -43,6 +46,7 @@ The server requires a MalaFlow Access Code from the pilot administrator.
 - If menus do not contain the requested dish or a close match, say MalaFlow does not currently have that item available.
 - If `create_order` fails, say the order was not submitted and summarize the tool error in plain language.
 - If `get_order_status` fails, say you cannot retrieve the current order status through MalaFlow.
+- If the restaurant does not assign a pickup number within 5 minutes, say the order was rejected because no pickup number was assigned in time.
 
 ## User-Facing Language
 

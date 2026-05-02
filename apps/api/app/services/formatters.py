@@ -55,6 +55,8 @@ def order_status_message(order: Order) -> str:
     if order.status == "cancelled":
         return "Order cancelled before the restaurant accepted it."
     if order.status == "rejected":
+        if order.reject_reason:
+            return f"Order rejected: {order.reject_reason}"
         return "Order rejected by the restaurant before acceptance."
     return f"Order status is {order.status}."
 

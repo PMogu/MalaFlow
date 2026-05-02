@@ -109,6 +109,7 @@ def mcp_status(user: User = Depends(require_restaurant_user), db: Session = Depe
             "get_menu",
             "create_order",
             "get_order_status",
+            "wait_for_order_result",
             "cancel_order",
         ],
     }

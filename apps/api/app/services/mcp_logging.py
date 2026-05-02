@@ -64,3 +64,20 @@ def run_logged_tool(tool_name: str, request_json: dict, handler: Callable) -> An
     finally:
         db.close()
 
+
+def run_logged_tool_without_db(tool_name: str, request_json: dict, handler: Callable[[], Any]) -> Any:
+    started = time.perf_counter()
+    restaurant_id = request_json.get("restaurant_id")
+    try:
+        result = handler()
+        latency = int((time.perf_counter() - started) * 1000)
+        log_mcp_call(tool_name, restaurant_id, request_json, "success", _summary(result), None, latency)
+        return result
+    except HTTPException as exc:
+        latency = int((time.perf_counter() - started) * 1000)
+        log_mcp_call(tool_name, restaurant_id, request_json, "error", None, str(exc.detail), latency)
+        raise
+    except Exception as exc:
+        latency = int((time.perf_counter() - started) * 1000)
+        log_mcp_call(tool_name, restaurant_id, request_json, "error", None, str(exc), latency)
+        raise

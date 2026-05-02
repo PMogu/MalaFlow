@@ -1,16 +1,24 @@
 from decimal import Decimal
 import logging
+import time
+from collections.abc import Callable
+from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import MenuItem, Order, OrderItem, Restaurant
+from app.database import SessionLocal
+from app.models import MenuItem, Order, OrderItem, Restaurant, utcnow
 from app.schemas import CreateOrderInput
 from app.services.formatters import order_out
 from app.services.notifications import notify_new_order_sms
 
 logger = logging.getLogger(__name__)
+
+ORDER_WAIT_POLL_SECONDS = 10
+ORDER_AUTO_REJECT_SECONDS = 5 * 60
+AUTO_REJECT_REASON = "No pickup number was assigned within 5 minutes."
 
 
 def _load_order(db: Session, order_id: str) -> Order:
@@ -25,6 +33,26 @@ def _assert_restaurant_access(order: Order, restaurant_id: str | None, is_admin:
         return
     if order.restaurant_id != restaurant_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="FORBIDDEN")
+
+
+def _aware_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _apply_auto_reject_if_expired(db: Session, order: Order, now: datetime | None = None) -> bool:
+    if order.status != "submitted":
+        return False
+    current = now or utcnow()
+    elapsed = (_aware_utc(current) - _aware_utc(order.created_at)).total_seconds()
+    if elapsed < ORDER_AUTO_REJECT_SECONDS:
+        return False
+    order.status = "rejected"
+    order.reject_reason = AUTO_REJECT_REASON
+    db.commit()
+    db.refresh(order)
+    return True
 
 
 def create_order(db: Session, payload: CreateOrderInput) -> dict:
@@ -84,17 +112,21 @@ def list_restaurant_orders(db: Session, restaurant_id: str) -> list[dict]:
         .where(Order.restaurant_id == restaurant_id)
         .order_by(Order.created_at.desc())
     ).all()
+    for order in orders:
+        _apply_auto_reject_if_expired(db, order)
     return [order_out(order) for order in orders]
 
 
 def get_order_status(db: Session, order_id: str) -> dict:
     order = _load_order(db, order_id)
+    _apply_auto_reject_if_expired(db, order)
     return order_out(order)
 
 
 def accept_order(db: Session, order_id: str, restaurant_id: str | None, order_number: str, is_admin: bool = False) -> dict:
     order = _load_order(db, order_id)
     _assert_restaurant_access(order, restaurant_id, is_admin)
+    _apply_auto_reject_if_expired(db, order)
     if order.status != "submitted":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="INVALID_ORDER_STATE")
     if not order_number.strip():
@@ -109,6 +141,7 @@ def accept_order(db: Session, order_id: str, restaurant_id: str | None, order_nu
 def reject_order(db: Session, order_id: str, restaurant_id: str | None, reason: str | None, is_admin: bool = False) -> dict:
     order = _load_order(db, order_id)
     _assert_restaurant_access(order, restaurant_id, is_admin)
+    _apply_auto_reject_if_expired(db, order)
     if order.status != "submitted":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="INVALID_ORDER_STATE")
     order.status = "rejected"
@@ -120,6 +153,7 @@ def reject_order(db: Session, order_id: str, restaurant_id: str | None, reason: 
 
 def cancel_order(db: Session, order_id: str, reason: str | None = None) -> dict:
     order = _load_order(db, order_id)
+    _apply_auto_reject_if_expired(db, order)
     if order.status != "submitted":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="INVALID_ORDER_STATE")
     order.status = "cancelled"
@@ -127,3 +161,30 @@ def cancel_order(db: Session, order_id: str, reason: str | None = None) -> dict:
     db.commit()
     db.refresh(order)
     return order_out(_load_order(db, order.id))
+
+
+def wait_for_order_result(
+    order_id: str,
+    poll_seconds: int = ORDER_WAIT_POLL_SECONDS,
+    timeout_seconds: int = ORDER_AUTO_REJECT_SECONDS,
+    sleep_fn: Callable[[float], None] = time.sleep,
+    session_factory: Callable[[], Session] = SessionLocal,
+) -> dict:
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        db = session_factory()
+        try:
+            order = _load_order(db, order_id)
+            _apply_auto_reject_if_expired(db, order)
+            if order.status != "submitted":
+                return order_out(order)
+            remaining_seconds = deadline - time.monotonic()
+            if remaining_seconds <= 0:
+                order.status = "rejected"
+                order.reject_reason = AUTO_REJECT_REASON
+                db.commit()
+                db.refresh(order)
+                return order_out(_load_order(db, order.id))
+        finally:
+            db.close()
+        sleep_fn(min(poll_seconds, remaining_seconds))
